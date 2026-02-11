@@ -1,0 +1,41 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel_redis
+    ports:
+      - "6379:6379"
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: sentinel_influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password12345
+      - DOCKER_INFLUXDB_INIT_ORG=sentinel
+      - DOCKER_INFLUXDB_INIT_BUCKET=metrics
+
+  # NEW SERVICES
+  agent:
+    build:
+      context: .
+      dockerfile: cmd/agent/Dockerfile
+    depends_on:
+      - redis
+    network_mode: "host" # Allows the agent to see the host machine's CPU
+
+  server:
+    build:
+      context: .
+      dockerfile: cmd/server/Dockerfile
+    depends_on:
+      - redis
+      - influxdb
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=RBYGG7_B0i73OJd-HOneR0yQVVioBz0ysLqAgqzLcnRcxcFhgveFiCFo54aV6gA6KnNQf0i4OLXCIuYCE3oTrQ==
+      - INFLUX_ORG=sentinel
+      - INFLUX_BUCKET=metrics
+      - REDIS_ADDR=redis:6379
