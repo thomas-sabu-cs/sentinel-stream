@@ -39,3 +39,5 @@ services:
       - INFLUX_ORG=sentinel
       - INFLUX_BUCKET=metrics
       - REDIS_ADDR=redis:6379
+    ports:
+      - "6060:6060"
