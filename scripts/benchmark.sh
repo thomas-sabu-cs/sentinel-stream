@@ -9,6 +9,12 @@ cd "${ROOT_DIR}"
 WORKERS="${WORKERS:-32}"
 DURATION="${DURATION:-60s}"
 REDIS_ADDR="${REDIS_ADDR:-localhost:6379}"
+# Set BINARY=false for JSON-only runs (e.g. to capture heap-json-optimized profile)
+BINARY_FLAG=""
+if [ "${BINARY:-true}" = "false" ]; then
+  BINARY_FLAG="-binary=false"
+  echo ">>> JSON-only mode (BINARY=false): load generator will send JSON, not binary."
+fi
 
 echo ">>> Starting Docker services (redis, influxdb, agent, server)..."
 docker compose up -d --build
@@ -16,10 +22,10 @@ docker compose up -d --build
 echo ">>> Waiting for services to become ready..."
 sleep 15
 
-echo ">>> Running load generator: workers=${WORKERS} duration=${DURATION} redis=${REDIS_ADDR}"
+echo ">>> Running load generator: workers=${WORKERS} duration=${DURATION} redis=${REDIS_ADDR} ${BINARY_FLAG}"
 mkdir -p profiles
 
-go run ./cmd/bench/main.go -workers "${WORKERS}" -duration "${DURATION}" -redis "${REDIS_ADDR}" &
+go run ./cmd/bench/main.go -workers "${WORKERS}" -duration "${DURATION}" -redis "${REDIS_ADDR}" ${BINARY_FLAG} &
 BENCH_PID=$!
 
 echo ">>> Collecting 30s CPU profile from pprof while load is running..."
