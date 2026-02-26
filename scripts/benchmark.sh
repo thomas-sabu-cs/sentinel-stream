@@ -31,10 +31,10 @@ wait "${BENCH_PID}"
 echo ">>> Collecting heap profile from pprof..."
 curl -sS "http://localhost:6060/debug/pprof/heap" -o "profiles/heap-$(date +%Y%m%d-%H%M%S).pb"
 
-echo ">>> Recent latency stats from server logs:"
-if ! docker compose logs server --tail=200 | grep -E "LATENCY_STATS"; then
-  echo "No LATENCY_STATS lines found yet. Ensure the benchmark ran long enough and load was high."
-fi
+echo ">>> Internal (core engine) latency — sub-ms P99:"
+docker compose logs server --tail=200 | grep -E "INTERNAL_LATENCY_STATS" || echo "No INTERNAL_LATENCY_STATS yet (ensure load ran 60s+)."
+echo ">>> E2E latency (producer → consumer complete):"
+docker compose logs server --tail=200 | grep -E "E2E_LATENCY_STATS" || echo "No E2E_LATENCY_STATS yet (ensure load ran 60s+)."
 
-echo "✅ Benchmark completed. Profiles are in the ./profiles directory."
+echo "✅ Benchmark completed. Profiles in ./profiles. Use INTERNAL_LATENCY_STATS for sub-ms P99, E2E_LATENCY_STATS for full pipeline."
 

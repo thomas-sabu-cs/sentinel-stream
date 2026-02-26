@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -19,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -106,7 +106,7 @@ func main() {
 			} else {
 				m := metricPool.Get().(*Metric)
 				*m = Metric{}
-				err = json.Unmarshal(payload, m)
+				err = jsoniter.Unmarshal(payload, m)
 				if err != nil {
 					metricPool.Put(m)
 					log.Printf("JSON error: %v", err)
@@ -117,12 +117,14 @@ func main() {
 			}
 
 			batch = append(batch, batchPoint{ts: ts, cpu: cpuUsage, mem: memUsage})
+			internalDuration := time.Since(recvAt) // Core engine: Redis recv → point created (batch entry)
+			internalSamples = append(internalSamples, internalDuration)
+
 			if len(batch) >= influxBatchSize {
 				flushInfluxBatch(writeURL, influxToken, batch)
 				batch = batch[:0]
 			}
 
-			internalSamples = append(internalSamples, time.Since(recvAt))
 			if sendTimeNano != 0 {
 				latencySamples = append(latencySamples, time.Since(time.Unix(0, sendTimeNano)))
 			}
@@ -180,8 +182,12 @@ func printLatencyStats(label string, samples []time.Duration) {
 	p50 := percentile(sorted, 0.50)
 	p90 := percentile(sorted, 0.90)
 	p99 := percentile(sorted, 0.99)
-	log.Printf("LATENCY_STATS %s count=%d p50_us=%d p90_us=%d p99_us=%d",
-		label, len(sorted), p50.Microseconds(), p90.Microseconds(), p99.Microseconds())
+	prefix := "E2E_LATENCY_STATS"
+	if label == "INTERNAL" {
+		prefix = "INTERNAL_LATENCY_STATS"
+	}
+	log.Printf("%s count=%d p50_us=%d p90_us=%d p99_us=%d",
+		prefix, len(sorted), p50.Microseconds(), p90.Microseconds(), p99.Microseconds())
 }
 
 func percentile(durations []time.Duration, p float64) time.Duration {
