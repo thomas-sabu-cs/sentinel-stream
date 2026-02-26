@@ -21,13 +21,15 @@ func NewRedisClient(addr string) *RedisClient {
 
 // PublishMetric converts our struct to JSON and sends it to a Redis channel
 func (r *RedisClient) PublishMetric(ctx context.Context, channel string, data interface{}) error {
-	// Convert the Go struct to a JSON string
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
+	return r.client.Publish(ctx, channel, payload).Err()
+}
 
-	// Publish to Redis
+// PublishBytes sends a raw payload to a Redis channel (e.g. for binary protocol).
+func (r *RedisClient) PublishBytes(ctx context.Context, channel string, payload []byte) error {
 	return r.client.Publish(ctx, channel, payload).Err()
 }
 

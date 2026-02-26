@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -29,6 +31,7 @@ func main() {
 		duration = flag.Duration("duration", 60*time.Second, "how long to run the benchmark")
 		redis    = flag.String("redis", "localhost:6379", "Redis address")
 		channel  = flag.String("channel", "metrics", "Redis Pub/Sub channel")
+		useBinary = flag.Bool("binary", true, "use binary protocol (32 bytes) instead of JSON for lower alloc")
 	)
 	flag.Parse()
 
@@ -66,17 +69,29 @@ func main() {
 					return
 				default:
 					now := time.Now()
-					m := &Metric{
-						Timestamp:        now.Unix(),
-						CPUUsage:         20 + 60*rand.Float64(),
-						MemUsage:         10 + 70*rand.Float64(),
-						SendTimeUnixNano: now.UnixNano(),
-					}
+					timestamp := now.Unix()
+					cpu := 20 + 60*rand.Float64()
+					mem := 10 + 70*rand.Float64()
+					sendTimeNano := now.UnixNano()
 
-					if err := rdb.PublishMetric(context.Background(), *channel, m); err != nil {
-						log.Printf("worker=%d publish error: %v", id, err)
-						time.Sleep(10 * time.Millisecond)
-						continue
+					if *useBinary {
+						var buf [32]byte
+						binary.LittleEndian.PutUint64(buf[0:8], uint64(timestamp))
+						binary.LittleEndian.PutUint64(buf[8:16], math.Float64bits(cpu))
+						binary.LittleEndian.PutUint64(buf[16:24], math.Float64bits(mem))
+						binary.LittleEndian.PutUint64(buf[24:32], uint64(sendTimeNano))
+						if err := rdb.PublishBytes(context.Background(), *channel, buf[:]); err != nil {
+							log.Printf("worker=%d publish error: %v", id, err)
+							time.Sleep(10 * time.Millisecond)
+							continue
+						}
+					} else {
+						m := &Metric{Timestamp: timestamp, CPUUsage: cpu, MemUsage: mem, SendTimeUnixNano: sendTimeNano}
+						if err := rdb.PublishMetric(context.Background(), *channel, m); err != nil {
+							log.Printf("worker=%d publish error: %v", id, err)
+							time.Sleep(10 * time.Millisecond)
+							continue
+						}
 					}
 
 					atomic.AddUint64(&totalSent, 1)
