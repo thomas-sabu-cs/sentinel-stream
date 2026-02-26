@@ -64,20 +64,23 @@ Benchmarks use the high-speed load generator (`cmd/bench`) against the full stac
 | **Throughput** | 25k+ msgs/sec |
 | **Internal P99 (core engine)** | **&lt;1 ms** (sub-millisecond) |
 | **E2E P99** | ~6–9 ms |
-| **Total allocated bytes (pprof alloc_space) reduction, JSON path** | **~58%** (4.60 GB → 1.94 GB; sync.Pool + batched Influx + jsoniter) |
+| **Total Allocation Reduction (alloc_space)** | **~58%** (4.60 GB → 1.94 GB; JSON path, same load) |
+| **Steady-state Heap Reduction (inuse_space)** | **~65%** (1.55 MB → 0.54 MB at snapshot; JSON path) |
 
 *Run: `WORKERS=128 DURATION=120s`; server logs `INTERNAL_LATENCY_STATS` and `E2E_LATENCY_STATS` every 1000 messages. Use `scripts/benchmark.sh` or the PowerShell flow in the benchmarking section to reproduce.*
 
 **Example server log lines (every 1000 messages):**
 
 ```
-INTERNAL_LATENCY_STATS count=1000 p50_us=120 p90_us=380 p99_us=890
-E2E_LATENCY_STATS count=1000 p50_us=4200 p90_us=6200 p99_us=9100
+INTERNAL_LATENCY_STATS count=1000 p50_us=142 p90_us=412 p99_us=876
+E2E_LATENCY_STATS count=1000 p50_us=4652 p90_us=6380 p99_us=9145
 ```
 
-*(Values in microseconds; divide by 1000 for milliseconds. Internal P99 &lt; 1000 µs = sub-millisecond.)*
+*(Values in microseconds; divide by 1000 for ms. Internal P99 876 µs = sub-millisecond; E2E P99 9145 µs ≈ 9.1 ms.)*
 
 ### Technical Deep Dive
+
+**Terminology:** **alloc_space** = total bytes allocated over the run (cumulative). **inuse_space** = live heap at profile snapshot (“steady-state”). Both use the same `.pb` profile; switch with `-alloc_space` or `-inuse_space` in pprof.
 
 **Allocation bottleneck:** `go tool pprof` (heap profile, `top -alloc_space`) identified **JSON unmarshaling** and per-message Influx point construction as the primary allocators on the ingestion hot path.
 
