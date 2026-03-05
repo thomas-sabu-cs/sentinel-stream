@@ -1,4 +1,5 @@
 # LEARNINGS — SentinelStream
+**tl;dr:** Built a Go-based real-time metrics pipeline (agent → Redis → InfluxDB) and used pprof + a custom load generator to drive it to 25k+ msgs/sec. Identified JSON decoding and per-message allocations as the main bottlenecks; reduced total allocation on the JSON path by ~58% and steady-state heap by ~65% via sync.Pool, batched writes, and jsoniter, while keeping the same JSON wire format.
 
 ## 1. What I Attempted
 
