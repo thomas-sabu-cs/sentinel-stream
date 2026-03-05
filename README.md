@@ -110,3 +110,13 @@ go tool pprof -top -alloc_space "-base=profiles/heap-before-pool-20260225.pb" se
 | `cpu-20260225-211922.pb` (or other `cpu-*.pb`) | 30s CPU profile. |
 
 Server logs: `INTERNAL_LATENCY_STATS` (core engine, sub-ms P99) and `E2E_LATENCY_STATS` (full pipeline). Grep these after a benchmark run to verify the table above.
+
+---
+
+## Technical Learnings
+
+- **alloc_space vs inuse_space:** pprof heap profiles support both cumulative total allocation (alloc_space) and live heap at snapshot (inuse_space); both are needed to state “total allocation reduction” vs “steady-state heap reduction” accurately.
+- **sync.Pool + batching + jsoniter** on the JSON path reduced allocations without changing the wire format; the bench’s `-binary=false` mode proves the improvement on the same format.
+- **Internal vs E2E latency:** Defining internal (Redis recv → point created) and E2E (producer send → consumer done) and logging them separately keeps “sub-millisecond P99” claims tied to the core engine, not the full pipeline.
+- **Single consumer + batch flush** keeps the server simple but creates a backpressure and shutdown-flush tradeoff; next steps could include consumer groups or explicit flush on signal.
+- Full technical learning log: [LEARNINGS.md](./LEARNINGS.md)
