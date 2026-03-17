@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/thomas-sabu-cs/sentinel-stream/internal/transport" // Use YOUR module name here
+	"github.com/thomas-sabu-cs/sentinel-stream/internal/transport" 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 )
